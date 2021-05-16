@@ -1,0 +1,34 @@
+
+.keys-font {
+	text-align: left;
+	font-family: sans-serif;
+    background-color: white;
+    text-transform: uppercase;
+    font-size:15px !important;
+}
+
+.sep-line{ 
+    border: 1px solid #303030;
+    width: 100%; 
+    margin-right: 10em;}
+
+.header{
+	text-align: left;
+    background-color: white;
+    font-size: 30px;
+    margin-top: 1em;
+}
+.error{
+    
+	text-align: left;
+	font-family: sans-serif;
+	color: red;
+    background-color: white;
+    font-size: 15px
+}
+.stButton>button {
+    color: black;
+    border-radius: 0%;
+    height: 1.5em;
+    text-align: left;
+}
