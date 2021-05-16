@@ -2,3 +2,4 @@ __pycache__/
 tests
 *.pyc
 secrete.py
+pull_function/secrete.py
