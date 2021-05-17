@@ -4,53 +4,63 @@ import pandas as pd
 import base64
 import json 
 import SessionState
-from datetime import datetime
 
-session_state = SessionState.get(checkboxed=False)
+session_state = SessionState.get(data = None, checkboxed=False)
 
 st.set_page_config(layout="wide")
 st.write('<style>div.row-widget.stRadio > div{flex-direction:row;}</style>', unsafe_allow_html=True) # make buttons display horizontally 
 st.markdown('<style>' + open('styles.css').read() + '</style>', unsafe_allow_html=True)
 st.title('Pull data from APIs')
+
+def initialise(): 
+    session_state.data = get_data()  
+  
+    st.markdown('<p class="sep-line"> </p>', unsafe_allow_html=True)    
+    if session_state.data is not None:
+        view_results(session_state.data)
             
-def initialise():  
-    st.markdown(' ## Choose an API', unsafe_allow_html=True)
-    api_list = ('Select', 'Appfollow', 'Trustpilot')  
-    col1, col2 = st.beta_columns([1,3]) # col 1 would take 1/3 of the width 
-    tool = col1.selectbox("", api_list)     
-    st.markdown('<p class="sep-line"> </p>', unsafe_allow_html=True)     
-    data = None
+def get_data():  
+    data = session_state.data
+    api_list = ('Select', 'Appfollow', 'Trustpilot') 
+    col1, col2 = st.beta_columns([1,3]) # col 1 would take 1/3 of the width     
+    st.sidebar.markdown(' ## Choose an API', unsafe_allow_html=True)
+    tool = st.sidebar.selectbox("", api_list)   
+
     if tool =='Appfollow':
         from api_pulls.pull_from_appfollow import appfollow  
-        data = appfollow()
+        data = appfollow(data)
         
     if tool =='Trustpilot':
-        from api_pulls.pull_from_trustpilot import appfollow 
+        from api_pulls.pull_from_trustpilot import trustpilot 
+        data = trustpilot(data)
+        
+    return data
 
-    if data:
-        view_results(data)
 
-    st.markdown('<p class="sep-line"> </p>', unsafe_allow_html=True)
-
-def view_results(data):  
-    st.markdown('<p class="sep-line"> </p>', unsafe_allow_html=True)
+def view_results(data): 
     st.markdown('## Results', unsafe_allow_html=True)
     st.markdown(f'### Fetched {len(data)} responses', unsafe_allow_html=True)
     col1, col2, col3 = st.beta_columns(3)
-    with col1:
-        if st.checkbox('Save as json'):  
-            data_json = json.dumps(data)
-            download_filename = st.text_input('Enter file name','file_name.json',help='file_name.json')
-            download_link(data_json, download_filename, 'Save as JSON')
-    with col2:            
-        if st.checkbox('Save as csv'):  
+
+    with st.beta_expander('View as table'):
+        if st.checkbox('View'):
             data_df = pd.DataFrame(data)
-            download_filename = st.text_input('Enter file name','file_name.csv',help='file_name.csv')
-            download_link(data_df, download_filename, 'Save as CSV')
-    with col3:
-        if st.checkbox('Save to S3 as JSONL'):
-            s3_location(data)
             
+    with st.beta_expander('Save to S3 as JSONL'):
+        
+        s3_location(data)
+
+    with st.beta_expander('Save as json'):  
+        data_json = json.dumps(data)
+        download_filename = st.text_input('Enter file name','file_name.json',help='file_name.json')
+        download_link(data_json, download_filename, 'Save as JSON')
+
+    with st.beta_expander('Save as csv'):  
+        data_df = pd.DataFrame(data)
+        download_filename = st.text_input('Enter file name','file_name.csv',help='file_name.csv')
+        download_link(data_df, download_filename, 'Save as CSV')
+        
+        
 def download_link(object_to_download, download_filename, download_link_text):
     if isinstance(object_to_download, pd.DataFrame):
         object_to_download = object_to_download.to_csv(index=False)
@@ -65,12 +75,5 @@ def s3_location(data):
     if st.button('save'):
         sf.upload_to_s3(data, loc_file_path, file_name, bucket, prefix)
     
-def trustpilot():
-    from api_pulls import pull_from_trustpilot
-    
-
-
-    
 
 initialise()
-
