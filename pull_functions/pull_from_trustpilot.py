@@ -63,7 +63,7 @@ def pullFromTrustpilot(business_units, api_key, start_date, end_date, business_u
                 if created_at >= start_date and created_at <= end_date:
                     out_lst.append(clean_response)   
             page_counter+=1       
-            if created_at <= start_date:
+            if not json_data['reviews'] or created_at <= start_date:
                 loading.write('Getting data... Done!')
                 break
     return out_lst

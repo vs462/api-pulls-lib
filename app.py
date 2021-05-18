@@ -1,92 +1,82 @@
+import requests
+import json
+import dateutil
 import streamlit as st
-import saving_functions as sf
-import pandas as pd
-import base64
-import json 
-import SessionState
 
-session_state = SessionState.get(data = None, data_df = None, view = None)
+loading = st.sidebar.empty()
+info_page = st.sidebar.empty()
+info_app  = st.sidebar.empty()
+    
+#session_state = SessionState.get(loading=loading, info_page = info_page, info_app=info_app)
 
-st.set_page_config(layout="wide")
-st.write('<style>div.row-widget.stRadio > div{flex-direction:row;}</style>', unsafe_allow_html=True) # make buttons display horizontally 
-st.markdown('<style>' + open('styles.css').read() + '</style>', unsafe_allow_html=True)
-st.title('Pull data from APIs')
+def trustpilot(data):
+    col1, col2 = st.beta_columns([2,1])  
+    api_key = 'YhzbqU4GeR6mQ2bHF97PYKUWCSkaaeG0'
+    
+    with col1:
+        business_unit = st.text_input('Enter business_unit','46d31466000064000500a775',help='46d31466000064000500a775')
+        start_date = st.text_input('Enter start date','2021-05-01',help='2020-11-01')
+        end_date= st.text_input('Enter end date','2021-05-03',help='2021-03-01')
+        business_unit_list = business_unit.replace(' ','').split(",")    
+    
+    if st.button('run'):
+        data = pullFromTrustpilot(business_unit_list, api_key, start_date, end_date, business_unit_list)       
+        return data
+    
+    if data:
+        return data    
 
-def initialise(): 
-    session_state.data = get_data()  
 
-    if session_state.data is not None:
-        st.markdown('<p class="sep-line"> </p>', unsafe_allow_html=True)       
-        view_results(session_state.data)
+def pullFromTrustpilot(business_units, api_key, start_date, end_date, business_unit_display_name):        
+    business_unit_list = [business_units] * (type(business_units) is str) or business_units
+
+    start_date = dateutil.parser.parse(start_date)
+    end_date = dateutil.parser.parse(end_date)  
+    out_lst = []
+    params = {'orderBy': "createdat.desc"}
+    
+    for business_unit in business_unit_list:
+        url = 'https://api.trustpilot.com/v1/business-units/{key}/reviews?perPage=50&page={page}'        
+        page_counter = 1                     
+        
+        while True:
+            query_url = url.format(key = business_unit, page = page_counter)
+            headers = {'apikey':api_key}
+            r = requests.get(query_url, headers=headers, params=params)
+            json_data = json.loads(r.text)
             
-def get_data():  
-    data = session_state.data 
-    
-    api_list = ('Select', 'Appfollow', 'Trustpilot', 'Intercom') 
-    col1, col2 = st.beta_columns([1,3]) # col 1 would take 1/3 of the width     
-    st.sidebar.markdown(' ## Choose an API', unsafe_allow_html=True)
-    tool = st.sidebar.selectbox("", api_list)   
+            loading.write('Getting data...')
+            info_page.write(f'Page: {page_counter}')
+            info_app.write(f'App: {business_unit}')
+            
+            try:
+                json_data['reviews']
+            except:
+                st.write(f'Error. Business_unit {business_unit}: ')
+                st.write(json_data)
+                break
+            
+            for response in json_data['reviews']:
+                clean_response = clean_responses(response, business_unit, 
+                                                 business_unit_display_name)
+                created_at = dateutil.parser.parse(clean_response['created_at'], ignoretz=True)
+                if created_at >= start_date and created_at <= end_date:
+                    out_lst.append(clean_response)   
+            page_counter+=1  
+            
+            if not json_data['reviews'] or created_at <= start_date:
+                loading.write('Getting data... Done!')
+                break
+    return out_lst
 
-    if tool =='Select':
-        description()
-
-    if tool =='Appfollow':
-        from api_pulls.pull_from_appfollow import appfollow  
-        data = appfollow(data)
-    
-    if tool =='Intercom':
-        from api_pulls.pull_from_intercom import intercom 
-        data = intercom(data)
-        
-    return data
-
-
-def view_results(data): 
-    st.markdown('## Results', unsafe_allow_html=True)
-    st.markdown(f'### Fetched {len(data)} responses', unsafe_allow_html=True)
-    col1, col2, col3 = st.beta_columns(3)
-
-    with st.beta_expander('View as table'): 
-        if st.button('View') or session_state.view:
-            session_state.view = True
-            if session_state.data_df is None:
-                session_state.data_df = pd.DataFrame(data)
-            st.write(session_state.data_df)
-    
-    with st.beta_expander('Save as csv'):  
-        if st.button('Save'):
-            if session_state.data_df is None:
-                session_state.data_df = pd.DataFrame(data)
-            download_filename = st.text_input('Enter file name','file_name.csv', help='file_name.csv')
-            download_link(session_state.data_df, download_filename, 'Save as CSV')
-
-    with st.beta_expander('Save to S3 as JSONL'):      
-        s3_location(data)
-
-
-    with st.beta_expander('Save as json'):  
-        data_json = json.dumps(data)
-        download_filename = st.text_input('Enter file name','file_name.json',help='file_name.json')
-        download_link(data_json, download_filename, 'Save as JSON')
-
-    
-def download_link(object_to_download, download_filename, download_link_text):
-    if isinstance(object_to_download, pd.DataFrame):
-        object_to_download = object_to_download.to_csv(index=False)
-    b64 = base64.b64encode(object_to_download.encode()).decode() # some strings <-> bytes conversions necessary here    
-    st.markdown(f'<a href="data:file/txt;base64,{b64}" download="{download_filename}">{download_link_text}</a>' , unsafe_allow_html=True)
-
-def s3_location(data):
-    loc_file_path = '/Users/vasilisa/desktop/api_pulls/data'  
-    file_name = st.text_input('Enter file name','file_name.jsonl')
-    bucket = st.selectbox('Choose bucket', sf.list_buckets())     
-    prefix = st.text_input('Enter prefix','folder/subfolder', help="Folder doesn't have to exist")    
-    if st.button('save'):
-        msg = sf.upload_to_s3(data, loc_file_path, file_name, bucket, prefix)
-        st.markdown(f'### {msg}')
-        
-def description():
-    st.markdown('''This app is designed to help backdating data from most commonly used API. 
-                It is advised to refresh the page when switching to a different API''')
-    
-initialise()
+def clean_responses(response, business_unit, business_unit_display_name):
+    clean_response = {}
+    clean_response['comment'] = response['text']
+    clean_response['score'] = response['stars']
+    clean_response['created_at'] = response['createdAt']
+    clean_response['language'] = response['language']
+    clean_response['title'] = response['title']
+    clean_response['response_id'] = response['id']
+    clean_response['business_unit'] = business_unit
+    #clean_response['business_unit_display_name'] = business_unit_display_name
+    return clean_response
