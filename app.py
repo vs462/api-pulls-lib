@@ -27,6 +27,9 @@ def get_data():
     st.sidebar.markdown(' ## Choose an API', unsafe_allow_html=True)
     tool = st.sidebar.selectbox("", api_list)   
 
+    if tool =='Select':
+        description()
+
     if tool =='Appfollow':
         from api_pulls.pull_from_appfollow import appfollow  
         data = appfollow(data)
@@ -81,6 +84,9 @@ def s3_location(data):
     if st.button('save'):
         msg = sf.upload_to_s3(data, loc_file_path, file_name, bucket, prefix)
         st.markdown(f'### {msg}')
-      
-
+        
+def description():
+    st.markdown('''This app is designed to help backdating data from most commonly used API. 
+                It is advised to refresh the page when switching to a different API''')
+    
 initialise()
