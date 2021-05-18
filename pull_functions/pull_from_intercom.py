@@ -47,8 +47,11 @@ def pullConversationListIntercom(api_key, from_date, to_date):
             info_tot_pages.write(f'Total pages with IDs is {total_pages}')                        
             for conversation in conversations:
                 out_list.append(conversation['id'])
-            starting_after = json_data['pages']['next']['starting_after']
-            pull_conversation_id_list_page(starting_after=starting_after)
+            try:
+                starting_after = json_data['pages']['next']['starting_after']
+                pull_conversation_id_list_page(starting_after=starting_after)
+            except KeyError:
+                print(json_data['pages'])
 
         else:            
             post_request['pagination'] = {'per_page': 150, 'starting_after': starting_after}
