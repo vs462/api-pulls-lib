@@ -1,20 +1,27 @@
 import requests
 import json
-from datetime import datetime
 import streamlit as st
+from datetime import datetime
 from secrete import api_key_intercom as api_key
 
+loading = st.sidebar.empty()
+info_tot_pages = st.sidebar.empty()
+tot_conv = st.sidebar.empty()
+info_page  = st.sidebar.empty()
 
 def intercom(data):
     col1, col2 = st.beta_columns([2,1])          
     with col1:
-        api_key = st.text_input('Enter api_key', api_key)
+        api_key = st.text_input('Enter api_key',api_key)
         from_date = st.text_input('Enter from date','2021-05-01',help='2020-11-01')
         to_date= st.text_input('Enter to date','2021-05-03',help='2021-03-01')  
         
     if st.button('run'):
+        loading.write('Getting Conversation IDs...')
         conversation_ids = pullConversationListIntercom(api_key, from_date, to_date)  
+        loading.write('Getting Conversations...')
         data = pull_full_conversations(api_key, conversation_ids)        
+        loading.write('Conversations pulled')        
         return data
     
     if data:
@@ -57,6 +64,7 @@ def pullConversationListIntercom(api_key, from_date, to_date):
             post_request['pagination'] = {'per_page': 150, 'starting_after': starting_after}
             r = requests.post(url, headers=headers, json=post_request)
             json_data = json.loads(r.text)            
+            info_page.write(f"On page: {json_data['pages']['page']}")
             conversations = json_data['conversations']
             for conversation in conversations:
                 out_list.append(conversation['id'])
